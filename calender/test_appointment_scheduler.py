@@ -1,7 +1,6 @@
 import datetime
 import enum
 import random
-import time
 
 from playwright.sync_api import Playwright, sync_playwright, expect
 calenderlink="https://link.gohighlevel.com/widget/appointment/test13june2022/13"
@@ -56,7 +55,9 @@ def run_calender(page):
     tz = random.choice(list(get_tz))
     print(tz.value[0])
     select_timezone(tz.value[0], page)
+    page.wait_for_timeout(timeout=10000)
     slot = select_and_get_first_time(page)
+    print(slot)
     page.wait_for_selector("text=Continue")
     page.locator("text=Continue").click()
     page.locator("id=first_name").fill("jyoti")
@@ -64,11 +65,10 @@ def run_calender(page):
     page.locator("id=phone").fill("08130727089")
     page.locator('//input[@name="email"]').fill("mail.jyotiarora1991@gmail.com")
     page.wait_for_timeout(10000)
-    # page.wait_for_selector("text=Schedule Meeting >> button")
-    # page.click("text=Schedule Meeting >> button")
     page.locator('//*[@id="appointment_widgets"]//footer//button').click()
     assert "Your Meeting has been Scheduled" in page.locator("text=Your Meeting has been Scheduled").text_content()
     schedule_time_user = "%s %s" % (appointment_date, slot)
+    print("schedule_time_user",schedule_time_user + tz.value[1])
     return get_time_timezone(schedule_time_user + tz.value[1], "%Y-%m-%d %I:%M %p %z")
 
 
@@ -77,15 +77,23 @@ def check_appointment(page):
     page.goto(appointmentslink)
     page.locator("id=email").fill("mail.jyotiarora1991@gmail.com")
     page.locator("id=password").fill("Test123!")
+    page.wait_for_selector("button:has-text(\"Sign in\")")
     page.locator("button:has-text(\"Sign in\")").click()
-    app_time=page.locator("#pg-appt__link-contact-detail").first.text_content()
+    page.wait_for_timeout(10000)
+    page.wait_for_selector('//*[@id="calendarEvents"]/div/div[3]/div/div/table/tbody/tr[1]/td[3]/div')
+    app_time=page.locator('//*[@id="calendarEvents"]/div/div[3]/div/div/table/tbody/tr[1]/td[3]/div').text_content()
+    print("app_time",app_time.strip() + ' ' + '+05:30')
     return get_time_timezone(app_time.strip() + ' ' + '+05:30', "%b %d %Y, %I:%M %p %z")
 
-
+# Main()
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=False)
     context = browser.new_context()
     page = context.new_page()
+    #Book appointment for given date 'appointment_date' and choose first slot after seleting random timezone
     schedule_time=run_calender(page)
+    #Extract appointment time.
     app_time=check_appointment(page)
     print(schedule_time,app_time)
+    #test
+    assert schedule_time==app_time
